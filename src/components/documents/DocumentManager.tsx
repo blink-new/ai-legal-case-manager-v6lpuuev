@@ -12,6 +12,7 @@ import { Upload, FileText, Image, Download, Eye, Trash2, Search, Filter, Plus, B
 
 
 import { useToast } from '@/hooks/use-toast'
+import { blink } from '@/blink/client'
 
 interface Document {
   id: string

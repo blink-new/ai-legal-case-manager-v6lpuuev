@@ -115,69 +115,13 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
     return unsubscribe
   }, [loadCases])
 
-  // Mock data for initial display if no cases exist
-  const mockCases: Case[] = [
-    {
-      id: '1',
-      caseNumber: 'PI-2024-001',
-      clientName: 'Sarah Johnson',
-      clientEmail: 'sarah.johnson@email.com',
-      clientPhone: '(555) 123-4567',
-      incidentDate: '2023-12-15',
-      caseType: 'personal_injury',
-      status: 'negotiating',
-      priority: 'high',
-      insuranceCompany: 'State Farm',
-      claimNumber: 'SF-789456123',
-      estimatedValue: 150000,
-      currentOffer: 85000,
-      description: 'Slip and fall accident at grocery store resulting in back injury',
-      assignedAttorney: 'John Doe',
-      createdAt: '2024-01-10',
-      updatedAt: '2024-01-18',
-      userId: 'user123',
-      nextDeadline: '2024-01-25',
-      settlementGoal: 175000
-    },
-    {
-      id: '2',
-      caseNumber: 'AUTO-2024-015',
-      clientName: 'Michael Chen',
-      clientEmail: 'michael.chen@email.com',
-      clientPhone: '(555) 987-6543',
-      incidentDate: '2024-01-05',
-      caseType: 'auto_accident',
-      status: 'investigating',
-      priority: 'medium',
-      insuranceCompany: 'Allstate',
-      estimatedValue: 85000,
-      description: 'Rear-end collision on Highway 101, whiplash and property damage',
-      assignedAttorney: 'Jane Smith',
-      createdAt: '2024-01-08',
-      updatedAt: '2024-01-18',
-      userId: 'user123',
-      nextDeadline: '2024-01-28'
-    },
-    {
-      id: '3',
-      caseNumber: 'WC-2024-008',
-      clientName: 'Lisa Rodriguez',
-      clientEmail: 'lisa.rodriguez@email.com',
-      clientPhone: '(555) 456-7890',
-      incidentDate: '2023-11-20',
-      caseType: 'workers_comp',
-      status: 'settled',
-      priority: 'low',
-      insuranceCompany: 'Liberty Mutual',
-      estimatedValue: 45000,
-      currentOffer: 45000,
-      description: 'Workplace injury - repetitive strain injury from computer work',
-      assignedAttorney: 'John Doe',
-      createdAt: '2023-11-25',
-      updatedAt: '2024-01-15',
-      userId: 'user123'
-    }
-  ]
+  // Debug logging to help troubleshoot
+  console.log('CaseList Debug:', {
+    user: user ? { id: user.id, email: user.email } : null,
+    casesCount: cases.length,
+    loading,
+    cases: cases.map(c => ({ id: c.id, clientName: c.clientName, caseNumber: c.caseNumber }))
+  })
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -335,9 +279,8 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
     }
   }
 
-  const displayCases = cases.length > 0 ? cases : mockCases
-
-  const filteredCases = displayCases.filter(case_ => {
+  // Always use actual cases, never show mock data
+  const filteredCases = cases.filter(case_ => {
     // Add null checks to prevent undefined errors
     const clientName = case_.clientName || ''
     const caseNumber = case_.caseNumber || ''

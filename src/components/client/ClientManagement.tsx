@@ -27,6 +27,7 @@ import {
 
 
 import { useToast } from '@/hooks/use-toast'
+import { blink } from '@/blink/client'
 
 interface Client {
   id: string

@@ -36,8 +36,7 @@ import {
   Bell
 } from 'lucide-react'
 import { Case, Document } from '@/types/case'
-
-
+import { blink } from '@/blink/client'
 import { useToast } from '@/hooks/use-toast'
 
 interface CaseDetailProps {

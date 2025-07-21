@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { blink } from '@/blink/client'
 
 export function DebugPanel() {
   const [user, setUser] = useState<any>(null)

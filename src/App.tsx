@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Dashboard } from '@/components/dashboard/Dashboard'
 import { CaseList } from '@/components/cases/CaseList'
 import { CaseDetail } from '@/components/cases/CaseDetail'
@@ -9,6 +9,7 @@ import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard'
 import { Settings } from '@/components/settings/Settings'
 import { ClientManagement } from '@/components/client/ClientManagement'
 import { Sidebar } from '@/components/layout/Sidebar'
+import { ProfileSetup } from '@/components/auth/ProfileSetup'
 import { DeadlineTest } from '@/components/debug/DeadlineTest'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
@@ -21,14 +22,47 @@ function AppContent() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [needsProfileSetup, setNeedsProfileSetup] = useState(false)
+
+  const loadUserProfile = useCallback(async (userId: string) => {
+    try {
+      setProfileLoading(true)
+      const profiles = await blink.db.userProfiles.list({
+        where: { userId: userId },
+        limit: 1
+      })
+      
+      if (profiles.length > 0) {
+        setUserProfile(profiles[0])
+        setNeedsProfileSetup(false)
+      } else {
+        setUserProfile(null)
+        setNeedsProfileSetup(true)
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error)
+      setNeedsProfileSetup(true)
+    } finally {
+      setProfileLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     const unsubscribe = blink.auth.onAuthStateChanged((state) => {
       setUser(state.user)
       setLoading(state.isLoading)
+      
+      if (state.user && !state.isLoading) {
+        loadUserProfile(state.user.id)
+      } else if (!state.user) {
+        setUserProfile(null)
+        setNeedsProfileSetup(false)
+      }
     })
     return unsubscribe
-  }, [])
+  }, [loadUserProfile])
 
   const logout = () => {
     blink.auth.logout()
@@ -86,12 +120,14 @@ function AppContent() {
     }
   }
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">
+            {loading ? 'Loading...' : 'Setting up your profile...'}
+          </p>
         </div>
       </div>
     )
@@ -108,6 +144,19 @@ function AppContent() {
           </Button>
         </div>
       </div>
+    )
+  }
+
+  // Show profile setup if user doesn't have a profile
+  if (needsProfileSetup) {
+    return (
+      <ProfileSetup 
+        user={user} 
+        onComplete={() => {
+          setNeedsProfileSetup(false)
+          loadUserProfile(user.id)
+        }} 
+      />
     )
   }
 
