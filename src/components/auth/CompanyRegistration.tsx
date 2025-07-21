@@ -358,7 +358,7 @@ export function CompanyRegistration({ user, onComplete }: CompanyRegistrationPro
 
       toast({
         title: "Registration Complete!",
-        description: "Your company has been successfully registered. Welcome to LegalAI!",
+        description: "Your company has been successfully registered. Welcome to Monster Law App!",
       })
 
       onComplete()

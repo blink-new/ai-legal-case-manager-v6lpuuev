@@ -70,7 +70,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       {/* Logo */}
       <div className="flex h-16 items-center border-b px-6">
         <Scale className="h-8 w-8 text-blue-600" />
-        <span className="ml-2 text-xl font-semibold text-gray-900">LegalAI</span>
+        <span className="ml-2 text-xl font-semibold text-gray-900">Monster Law App</span>
       </div>
 
       {/* Navigation */}

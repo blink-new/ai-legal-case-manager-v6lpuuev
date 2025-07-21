@@ -99,7 +99,7 @@ export function ProfileSetup({ user, onComplete }: ProfileSetupProps) {
             <Scale className="h-12 w-12 text-blue-600" />
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
-            Welcome to LegalAI
+            Welcome to Monster Law App
           </CardTitle>
           <p className="text-gray-600">
             Let's set up your law firm profile to get started

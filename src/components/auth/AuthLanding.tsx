@@ -10,7 +10,7 @@ export function AuthLanding() {
   const handleLogin = async () => {
     setLoading(true)
     try {
-      await blink.auth.login()
+      await blink.auth.login(window.location.origin) // Redirect to current page after auth
     } catch (error) {
       console.error('Login error:', error)
     } finally {
@@ -21,7 +21,7 @@ export function AuthLanding() {
   const handleSignUp = async () => {
     setLoading(true)
     try {
-      await blink.auth.login() // Blink handles both login and signup
+      await blink.auth.login(window.location.origin) // Redirect to current page after auth
     } catch (error) {
       console.error('Signup error:', error)
     } finally {
@@ -209,7 +209,7 @@ export function AuthLanding() {
                   onClick={handleLogin}
                   variant="outline"
                   size="lg"
-                  className="w-full border-white text-white hover:bg-white/10"
+                  className="w-full border-white text-white hover:bg-white hover:text-blue-600"
                   disabled={loading}
                 >
                   Already have an account? Sign In
@@ -225,7 +225,7 @@ export function AuthLanding() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex justify-center items-center space-x-2 mb-4">
             <Scale className="h-6 w-6" />
-            <span className="text-xl font-semibold">LegalAI</span>
+            <span className="text-xl font-semibold">Monster Law App</span>
           </div>
           <p className="text-gray-400">
             © 2024 AI Legal Case Manager. All rights reserved.
