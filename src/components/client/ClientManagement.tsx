@@ -24,8 +24,8 @@ import {
   Trash2,
   Eye
 } from 'lucide-react'
-import { apiService } from '@/services/api'
-import { useAuth } from '@/hooks/useAuth'
+
+
 import { useToast } from '@/hooks/use-toast'
 
 interface Client {

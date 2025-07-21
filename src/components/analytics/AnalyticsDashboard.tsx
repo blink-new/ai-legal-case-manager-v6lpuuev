@@ -32,8 +32,8 @@ import {
   Calendar,
   AlertTriangle
 } from 'lucide-react'
-import { apiService } from '@/services/api'
-import { useAuth } from '@/hooks/useAuth'
+
+import { blink } from '@/blink/client'
 
 interface AnalyticsData {
   totalCases: number

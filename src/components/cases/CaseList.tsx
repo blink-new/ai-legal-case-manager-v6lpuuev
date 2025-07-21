@@ -24,8 +24,7 @@ import {
   Loader2
 } from 'lucide-react'
 import { Case } from '@/types/case'
-import { apiService } from '@/services/api'
-import { useAuth } from '@/hooks/useAuth'
+import { blink } from '@/blink/client'
 import { useToast } from '@/hooks/use-toast'
 
 interface CaseListProps {
@@ -40,7 +39,7 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const { user, isAuthenticated } = useAuth()
+  const [user, setUser] = useState<any>(null)
   const { toast } = useToast()
 
   // Form state
@@ -64,36 +63,57 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
   const [uploading, setUploading] = useState(false)
 
   const loadCases = useCallback(async () => {
-    if (!isAuthenticated) return
+    if (!user) return
     
     try {
       setLoading(true)
-      const response = await apiService.getCases()
+      const casesData = await blink.db.cases.list({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' }
+      })
       
-      if (response.success && response.data) {
-        setCases(response.data.cases || [])
-      } else {
-        setCases([])
-      }
+      // Convert snake_case to camelCase
+      const formattedCases = casesData.map((caseData: any) => ({
+        id: caseData.id,
+        caseNumber: caseData.case_number,
+        clientName: caseData.client_name,
+        clientEmail: caseData.client_email || '',
+        clientPhone: caseData.client_phone || '',
+        caseType: caseData.case_type,
+        status: caseData.status,
+        priority: caseData.priority,
+        estimatedValue: caseData.estimated_value,
+        description: caseData.description,
+        incidentDate: caseData.incident_date,
+        nextDeadline: caseData.next_deadline,
+        createdAt: caseData.created_at,
+        updatedAt: caseData.updated_at,
+        userId: caseData.user_id
+      }))
+      
+      setCases(formattedCases)
     } catch (error) {
       console.error('Error loading cases:', error)
       toast({
         title: "Info",
         description: "No cases found. Create your first case to get started.",
       })
-      // Set empty array to show mock data
       setCases([])
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated, toast])
+  }, [user, toast])
 
-  // Load cases when user changes
+  // Set up auth state listener
   useEffect(() => {
-    if (isAuthenticated) {
-      loadCases()
-    }
-  }, [isAuthenticated, loadCases])
+    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
+      setUser(state.user)
+      if (state.user && !state.isLoading) {
+        loadCases()
+      }
+    })
+    return unsubscribe
+  }, [loadCases])
 
   // Mock data for initial display if no cases exist
   const mockCases: Case[] = [
@@ -214,33 +234,28 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
     setUploading(true)
 
     try {
-      // Generate case number
+      // Generate case number and ID
       const caseNumber = generateCaseNumber(formData.caseType)
+      const caseId = `case_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       
-      // Create case via API
-      const response = await apiService.createCase({
+      // Create case using Blink SDK
+      const newCase = await blink.db.cases.create({
+        id: caseId,
+        userId: user.id,
         caseNumber: caseNumber,
         clientName: formData.clientName,
         clientEmail: formData.clientEmail,
-        clientPhone: formData.clientPhone,
+        clientPhone: formData.clientPhone || '',
         caseType: formData.caseType,
         status: 'new',
         priority: formData.priority,
-        insuranceCompany: formData.insuranceCompany,
-        claimNumber: formData.claimNumber,
+        insuranceCompany: formData.insuranceCompany || '',
+        claimNumber: formData.claimNumber || '',
         estimatedValue: parseInt(formData.estimatedValue) || 0,
-        incidentDate: formData.incidentDate,
-        description: formData.description,
-        assignedAttorney: formData.assignedAttorney || user.email,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        incidentDate: formData.incidentDate || new Date().toISOString().split('T')[0],
+        description: formData.description || '',
+        nextDeadline: null
       })
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to create case')
-      }
-
-      const newCase = response.data
 
       // Upload documents if any
       if (uploadedFiles.length > 0) {
@@ -250,13 +265,26 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
           try {
             setUploadProgress(prev => ({ ...prev, [file.name]: 0 }))
             
-            const uploadResponse = await apiService.uploadDocument(file, newCase.id)
+            // Upload to Blink storage
+            const { publicUrl } = await blink.storage.upload(
+              file,
+              `cases/${caseId}/documents/${file.name}`,
+              { upsert: true }
+            )
 
-            if (uploadResponse.success) {
-              setUploadProgress(prev => ({ ...prev, [file.name]: 100 }))
-            } else {
-              throw new Error(uploadResponse.error || 'Upload failed')
-            }
+            // Save document record to database
+            await blink.db.documents.create({
+              id: `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              userId: user.id,
+              caseId: caseId,
+              filename: file.name,
+              fileUrl: publicUrl,
+              fileSize: file.size,
+              fileType: file.type,
+              uploadedAt: new Date().toISOString()
+            })
+
+            setUploadProgress(prev => ({ ...prev, [file.name]: 100 }))
           } catch (error) {
             console.error(`Error uploading ${file.name}:`, error)
             toast({

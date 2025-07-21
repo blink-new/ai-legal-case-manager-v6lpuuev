@@ -19,8 +19,8 @@ import {
   Target,
   AlertCircle
 } from 'lucide-react'
-import { apiService } from '@/services/api'
-import { useAuth } from '@/hooks/useAuth'
+
+import { blink } from '@/blink/client'
 
 interface Message {
   id: string
@@ -48,35 +48,34 @@ export function AINegotiator() {
   const [isLoading, setIsLoading] = useState(false)
   const [demandAmount, setDemandAmount] = useState('')
   const [currentOffer, setCurrentOffer] = useState('')
-  const { user, isAuthenticated } = useAuth()
+  const [user, setUser] = useState<any>(null)
   const [cases, setCases] = useState<any[]>([])
   const [casesLoading, setCasesLoading] = useState(true)
 
-  // Load cases from API
+  // Load cases from Blink DB
   const loadCases = useCallback(async () => {
-    if (!isAuthenticated) return
+    if (!user) return
     
     try {
       setCasesLoading(true)
-      const response = await apiService.getCases()
+      const casesData = await blink.db.cases.list({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' }
+      })
       
-      if (response.success && response.data) {
-        // Transform API cases to the format expected by the component
-        const transformedCases = response.data.cases.map((case_: any) => ({
-          id: case_.id,
-          number: case_.caseNumber || case_.case_number,
-          client: case_.clientName || case_.client_name,
-          value: case_.estimatedValue || case_.estimated_value || 0,
-          insuranceCompany: case_.insuranceCompany || case_.insurance_company,
-          claimNumber: case_.claimNumber || case_.claim_number,
-          status: case_.status,
-          priority: case_.priority
-        }))
-        
-        setCases(transformedCases)
-      } else {
-        setCases([])
-      }
+      // Transform cases to the format expected by the component
+      const transformedCases = casesData.map((case_: any) => ({
+        id: case_.id,
+        number: case_.case_number,
+        client: case_.client_name,
+        value: case_.estimated_value || 0,
+        insuranceCompany: case_.insurance_company,
+        claimNumber: case_.claim_number,
+        status: case_.status,
+        priority: case_.priority
+      }))
+      
+      setCases(transformedCases)
     } catch (error) {
       console.error('Error loading cases:', error)
       // Fallback to mock data if API fails
@@ -88,14 +87,18 @@ export function AINegotiator() {
     } finally {
       setCasesLoading(false)
     }
-  }, [isAuthenticated])
+  }, [user])
 
-  // Load cases when user is authenticated
+  // Set up auth state listener
   useEffect(() => {
-    if (isAuthenticated) {
-      loadCases()
-    }
-  }, [isAuthenticated, loadCases])
+    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
+      setUser(state.user)
+      if (state.user && !state.isLoading) {
+        loadCases()
+      }
+    })
+    return unsubscribe
+  }, [loadCases])
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !selectedCase) return
@@ -302,7 +305,7 @@ Sincerely,
   }
 
   // Show loading state while authentication is being checked
-  if (!isAuthenticated) {
+  if (!user) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">

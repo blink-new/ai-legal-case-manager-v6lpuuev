@@ -26,8 +26,7 @@ import {
   Gavel,
   User
 } from 'lucide-react'
-import { apiService } from '../../services/api'
-import { useAuth } from '../../hooks/useAuth'
+import { blink } from '../../blink/client'
 import { useToast } from '../../hooks/use-toast'
 
 interface CalendarEvent {
@@ -76,7 +75,7 @@ export function Calendar() {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(false)
-  const { user, isAuthenticated } = useAuth()
+  const [user, setUser] = useState<any>(null)
   const [view, setView] = useState<'month' | 'week' | 'day' | 'agenda'>('month')
   const [showEventDialog, setShowEventDialog] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
@@ -98,93 +97,105 @@ export function Calendar() {
     reminder_minutes: 15
   })
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      const loadEvents = async () => {
-        try {
-          setLoading(true)
-          // Mock events for now since we don't have calendar API endpoints
-          const mockEvents: CalendarEvent[] = [
-            {
-              id: '1',
-              title: 'Client Meeting - Sarah Johnson',
-              description: 'Discuss case progress and next steps',
-              start_date: new Date(Date.now() + 86400000).toISOString(),
-              end_date: new Date(Date.now() + 86400000 + 3600000).toISOString(),
-              event_type: 'meeting',
-              location: 'Conference Room A',
-              attendees: 'sarah.johnson@email.com',
-              case_id: '1',
-              priority: 'high',
-              reminder_minutes: 15,
-              user_id: user?.id || '',
-              created_at: new Date().toISOString()
-            },
-            {
-              id: '2',
-              title: 'Court Hearing - PI-2024-001',
-              description: 'Motion hearing for summary judgment',
-              start_date: new Date(Date.now() + 172800000).toISOString(),
-              end_date: new Date(Date.now() + 172800000 + 7200000).toISOString(),
-              event_type: 'court',
-              location: 'Superior Court Room 3',
-              attendees: '',
-              case_id: '1',
-              priority: 'high',
-              reminder_minutes: 60,
-              user_id: user?.id || '',
-              created_at: new Date().toISOString()
-            },
-            {
-              id: '3',
-              title: 'Discovery Deadline',
-              description: 'All discovery must be completed',
-              start_date: new Date(Date.now() + 604800000).toISOString(),
-              end_date: new Date(Date.now() + 604800000).toISOString(),
-              event_type: 'deadline',
-              location: '',
-              attendees: '',
-              case_id: '2',
-              priority: 'medium',
-              reminder_minutes: 1440,
-              user_id: user?.id || '',
-              created_at: new Date().toISOString()
-            }
-          ]
-          setEvents(mockEvents)
-        } catch (error) {
-          console.error('Error loading events:', error)
-        } finally {
-          setLoading(false)
-        }
-      }
+  const loadData = async (currentUser: any) => {
+    if (!currentUser) return
 
-      const loadCases = async () => {
-        try {
-          const response = await apiService.getCases()
-          if (response.success && response.data) {
-            const transformedCases = response.data.cases.map((case_: any) => ({
-              id: case_.id,
-              title: case_.caseNumber || case_.case_number,
-              client_name: case_.clientName || case_.client_name
-            }))
-            setCases(transformedCases)
+    const loadEvents = async () => {
+      try {
+        setLoading(true)
+        // Mock events for now since we don't have calendar API endpoints
+        const mockEvents: CalendarEvent[] = [
+          {
+            id: '1',
+            title: 'Client Meeting - Sarah Johnson',
+            description: 'Discuss case progress and next steps',
+            start_date: new Date(Date.now() + 86400000).toISOString(),
+            end_date: new Date(Date.now() + 86400000 + 3600000).toISOString(),
+            event_type: 'meeting',
+            location: 'Conference Room A',
+            attendees: 'sarah.johnson@email.com',
+            case_id: '1',
+            priority: 'high',
+            reminder_minutes: 15,
+            user_id: currentUser.id,
+            created_at: new Date().toISOString()
+          },
+          {
+            id: '2',
+            title: 'Court Hearing - PI-2024-001',
+            description: 'Motion hearing for summary judgment',
+            start_date: new Date(Date.now() + 172800000).toISOString(),
+            end_date: new Date(Date.now() + 172800000 + 7200000).toISOString(),
+            event_type: 'court',
+            location: 'Superior Court Room 3',
+            attendees: '',
+            case_id: '1',
+            priority: 'high',
+            reminder_minutes: 60,
+            user_id: currentUser.id,
+            created_at: new Date().toISOString()
+          },
+          {
+            id: '3',
+            title: 'Discovery Deadline',
+            description: 'All discovery must be completed',
+            start_date: new Date(Date.now() + 604800000).toISOString(),
+            end_date: new Date(Date.now() + 604800000).toISOString(),
+            event_type: 'deadline',
+            location: '',
+            attendees: '',
+            case_id: '2',
+            priority: 'medium',
+            reminder_minutes: 1440,
+            user_id: currentUser.id,
+            created_at: new Date().toISOString()
           }
-        } catch (error) {
-          console.error('Error loading cases:', error)
-          // Fallback to mock cases
-          setCases([
-            { id: '1', title: 'PI-2024-001', client_name: 'Sarah Johnson' },
-            { id: '2', title: 'AUTO-2024-015', client_name: 'Michael Chen' },
-            { id: '3', title: 'WC-2024-008', client_name: 'Lisa Rodriguez' }
-          ])
-        }
+        ]
+        setEvents(mockEvents)
+      } catch (error) {
+        console.error('Error loading events:', error)
+      } finally {
+        setLoading(false)
       }
-
-      loadEvents()
-      loadCases()
     }
-  }, [isAuthenticated, user])
+
+    const loadCases = async () => {
+      try {
+        const casesData = await blink.db.cases.list({
+          where: { userId: currentUser.id },
+          orderBy: { createdAt: 'desc' }
+        })
+        
+        const transformedCases = casesData.map((case_: any) => ({
+          id: case_.id,
+          title: case_.case_number,
+          client_name: case_.client_name
+        }))
+        setCases(transformedCases)
+      } catch (error) {
+        console.error('Error loading cases:', error)
+        // Fallback to mock cases
+        setCases([
+          { id: '1', title: 'PI-2024-001', client_name: 'Sarah Johnson' },
+          { id: '2', title: 'AUTO-2024-015', client_name: 'Michael Chen' },
+          { id: '3', title: 'WC-2024-008', client_name: 'Lisa Rodriguez' }
+        ])
+      }
+    }
+
+    loadEvents()
+    loadCases()
+  }
+
+  useEffect(() => {
+    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
+      setUser(state.user)
+      if (state.user && !state.isLoading) {
+        loadData(state.user)
+      }
+    })
+    return unsubscribe
+  }, [])
 
   const createEvent = async () => {
     if (!user || !newEvent.title || !newEvent.start_date) {
@@ -343,7 +354,7 @@ export function Calendar() {
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-  if (!isAuthenticated) {
+  if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dashboard } from '@/components/dashboard/Dashboard'
 import { CaseList } from '@/components/cases/CaseList'
 import { CaseDetail } from '@/components/cases/CaseDetail'
@@ -10,19 +10,29 @@ import { Settings } from '@/components/settings/Settings'
 import { ClientManagement } from '@/components/client/ClientManagement'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { DeadlineTest } from '@/components/debug/DeadlineTest'
-import { AuthPage } from '@/components/auth/AuthPage'
-import { AuthProvider } from '@/contexts/AuthContext'
-import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 import { Menu, LogOut } from 'lucide-react'
+import { blink } from '@/blink/client'
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  
-  const { user, loading, logout } = useAuth()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
+      setUser(state.user)
+      setLoading(state.isLoading)
+    })
+    return unsubscribe
+  }, [])
+
+  const logout = () => {
+    blink.auth.logout()
+  }
 
   const handleNavigation = (tab: string, caseId?: string) => {
     console.log('Navigation clicked:', tab, caseId ? `with caseId: ${caseId}` : '')
@@ -88,7 +98,17 @@ function AppContent() {
   }
 
   if (!user) {
-    return <AuthPage />
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">AI Legal Case Manager</h1>
+          <p className="text-gray-600 mb-6">Please sign in to access your legal case management dashboard</p>
+          <Button onClick={() => blink.auth.login()} className="bg-blue-600 hover:bg-blue-700">
+            Sign In
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -143,11 +163,7 @@ function AppContent() {
 }
 
 function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  )
+  return <AppContent />
 }
 
 export default App

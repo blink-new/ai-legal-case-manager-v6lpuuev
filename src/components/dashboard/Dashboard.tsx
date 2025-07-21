@@ -14,8 +14,7 @@ import {
   ArrowRight
 } from 'lucide-react'
 import { Case } from '@/types/case'
-import { apiService } from '@/services/api'
-import { useAuth } from '@/hooks/useAuth'
+import { blink } from '@/blink/client'
 
 interface DashboardProps {
   onNavigate: (tab: string, caseId?: string) => void
@@ -24,35 +23,55 @@ interface DashboardProps {
 export function Dashboard({ onNavigate }: DashboardProps) {
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
-  const { user, isAuthenticated } = useAuth()
+  const [user, setUser] = useState<any>(null)
 
   // Load cases from database
   const loadCases = useCallback(async () => {
-    if (!isAuthenticated) return
+    if (!user) return
     
     try {
       setLoading(true)
-      const response = await apiService.getCases({ limit: 5 })
+      const casesData = await blink.db.cases.list({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+        limit: 20
+      })
       
-      if (response.success && response.data) {
-        setCases(response.data.cases || [])
-      } else {
-        setCases([])
-      }
+      // Convert snake_case to camelCase and handle boolean fields
+      const formattedCases = casesData.map((caseData: any) => ({
+        id: caseData.id,
+        caseNumber: caseData.case_number,
+        clientName: caseData.client_name,
+        caseType: caseData.case_type,
+        status: caseData.status,
+        priority: caseData.priority,
+        estimatedValue: caseData.estimated_value,
+        description: caseData.description,
+        incidentDate: caseData.incident_date,
+        nextDeadline: caseData.next_deadline,
+        createdAt: caseData.created_at,
+        updatedAt: caseData.updated_at
+      }))
+      
+      setCases(formattedCases)
     } catch (error) {
       console.error('Error loading cases:', error)
       setCases([])
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated])
+  }, [user])
 
-  // Load cases when user changes
+  // Set up auth state listener
   useEffect(() => {
-    if (isAuthenticated) {
-      loadCases()
-    }
-  }, [isAuthenticated, loadCases])
+    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
+      setUser(state.user)
+      if (state.user && !state.isLoading) {
+        loadCases()
+      }
+    })
+    return unsubscribe
+  }, [loadCases])
 
   // Calculate dynamic stats from actual cases
   const activeCases = cases.filter(c => c.status !== 'settled' && c.status !== 'closed').length

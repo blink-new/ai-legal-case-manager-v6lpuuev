@@ -28,8 +28,8 @@ import {
   Clock,
   DollarSign
 } from 'lucide-react'
-import { apiService } from '../../services/api'
-import { useAuth } from '../../hooks/useAuth'
+
+
 import { useToast } from '../../hooks/use-toast'
 
 interface UserProfile {
