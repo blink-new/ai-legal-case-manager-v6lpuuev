@@ -10,6 +10,7 @@ import { Settings } from '@/components/settings/Settings'
 import { ClientManagement } from '@/components/client/ClientManagement'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { CompanyRegistration } from '@/components/auth/CompanyRegistration'
+import { AuthLanding } from '@/components/auth/AuthLanding'
 import { DeadlineTest } from '@/components/debug/DeadlineTest'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
@@ -134,17 +135,7 @@ function AppContent() {
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">AI Legal Case Manager</h1>
-          <p className="text-gray-600 mb-6">Please sign in to access your legal case management dashboard</p>
-          <Button onClick={() => blink.auth.login()} className="bg-blue-600 hover:bg-blue-700">
-            Sign In
-          </Button>
-        </div>
-      </div>
-    )
+    return <AuthLanding />
   }
 
   // Show company registration if user doesn't have a profile
