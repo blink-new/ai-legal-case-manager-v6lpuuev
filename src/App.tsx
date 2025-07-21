@@ -9,7 +9,7 @@ import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard'
 import { Settings } from '@/components/settings/Settings'
 import { ClientManagement } from '@/components/client/ClientManagement'
 import { Sidebar } from '@/components/layout/Sidebar'
-import { ProfileSetup } from '@/components/auth/ProfileSetup'
+import { CompanyRegistration } from '@/components/auth/CompanyRegistration'
 import { DeadlineTest } from '@/components/debug/DeadlineTest'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
@@ -147,10 +147,10 @@ function AppContent() {
     )
   }
 
-  // Show profile setup if user doesn't have a profile
+  // Show company registration if user doesn't have a profile
   if (needsProfileSetup) {
     return (
-      <ProfileSetup 
+      <CompanyRegistration 
         user={user} 
         onComplete={() => {
           setNeedsProfileSetup(false)

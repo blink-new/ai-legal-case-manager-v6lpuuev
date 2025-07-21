@@ -32,6 +32,7 @@ import {
 
 import { useToast } from '../../hooks/use-toast'
 import { blink } from '../../blink/client'
+import { CompanySettings } from './CompanySettings'
 
 interface UserProfile {
   id: string
@@ -251,14 +252,18 @@ export function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="profile" className="flex items-center space-x-2">
             <User className="h-4 w-4" />
             <span>Profile</span>
           </TabsTrigger>
+          <TabsTrigger value="company" className="flex items-center space-x-2">
+            <Building className="h-4 w-4" />
+            <span>Company</span>
+          </TabsTrigger>
           <TabsTrigger value="firm" className="flex items-center space-x-2">
             <Building className="h-4 w-4" />
-            <span>Firm</span>
+            <span>Legacy</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center space-x-2">
             <Bell className="h-4 w-4" />
@@ -371,6 +376,10 @@ export function Settings() {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="company" className="space-y-6">
+          <CompanySettings />
         </TabsContent>
 
         <TabsContent value="firm" className="space-y-6">
