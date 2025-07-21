@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { blink } from '@/blink/client'
+import { apiService } from '@/services/api'
+import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 

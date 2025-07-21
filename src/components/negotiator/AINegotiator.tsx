@@ -19,13 +19,8 @@ import {
   Target,
   AlertCircle
 } from 'lucide-react'
-import { createClient } from '@blinkdotnew/sdk'
-
-// Create a single Blink client instance
-const blink = createClient({
-  projectId: 'ai-legal-case-manager-v6lpuuev',
-  authRequired: true
-})
+import { apiService } from '@/services/api'
+import { useAuth } from '@/hooks/useAuth'
 
 interface Message {
   id: string
@@ -53,47 +48,38 @@ export function AINegotiator() {
   const [isLoading, setIsLoading] = useState(false)
   const [demandAmount, setDemandAmount] = useState('')
   const [currentOffer, setCurrentOffer] = useState('')
-  const [user, setUser] = useState<any>(null)
-  const [authLoading, setAuthLoading] = useState(true)
+  const { user, isAuthenticated } = useAuth()
   const [cases, setCases] = useState<any[]>([])
   const [casesLoading, setCasesLoading] = useState(true)
 
-  // Authentication state management
-  useEffect(() => {
-    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
-      setUser(state.user)
-      setAuthLoading(state.isLoading)
-    })
-    return unsubscribe
-  }, [])
-
-  // Load cases from database
+  // Load cases from API
   const loadCases = useCallback(async () => {
-    if (!user?.id) return
+    if (!isAuthenticated) return
     
     try {
       setCasesLoading(true)
-      const casesData = await blink.db.cases.list({
-        where: { userId: user.id },
-        orderBy: { createdAt: 'desc' }
-      })
+      const response = await apiService.getCases()
       
-      // Transform database cases to the format expected by the component
-      const transformedCases = casesData.map((case_: any) => ({
-        id: case_.id,
-        number: case_.caseNumber || case_.case_number,
-        client: case_.clientName || case_.client_name,
-        value: case_.estimatedValue || case_.estimated_value || 0,
-        insuranceCompany: case_.insuranceCompany || case_.insurance_company,
-        claimNumber: case_.claimNumber || case_.claim_number,
-        status: case_.status,
-        priority: case_.priority
-      }))
-      
-      setCases(transformedCases)
+      if (response.success && response.data) {
+        // Transform API cases to the format expected by the component
+        const transformedCases = response.data.cases.map((case_: any) => ({
+          id: case_.id,
+          number: case_.caseNumber || case_.case_number,
+          client: case_.clientName || case_.client_name,
+          value: case_.estimatedValue || case_.estimated_value || 0,
+          insuranceCompany: case_.insuranceCompany || case_.insurance_company,
+          claimNumber: case_.claimNumber || case_.claim_number,
+          status: case_.status,
+          priority: case_.priority
+        }))
+        
+        setCases(transformedCases)
+      } else {
+        setCases([])
+      }
     } catch (error) {
       console.error('Error loading cases:', error)
-      // Fallback to mock data if database fails
+      // Fallback to mock data if API fails
       setCases([
         { id: '1', number: 'PI-2024-001', client: 'Sarah Johnson', value: 150000 },
         { id: '2', number: 'AUTO-2024-015', client: 'Michael Chen', value: 85000 },
@@ -102,14 +88,14 @@ export function AINegotiator() {
     } finally {
       setCasesLoading(false)
     }
-  }, [user?.id])
+  }, [isAuthenticated])
 
   // Load cases when user is authenticated
   useEffect(() => {
-    if (user?.id) {
+    if (isAuthenticated) {
       loadCases()
     }
-  }, [user?.id, loadCases])
+  }, [isAuthenticated, loadCases])
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !selectedCase) return
@@ -126,31 +112,27 @@ export function AINegotiator() {
     setIsLoading(true)
 
     try {
-      // Use Blink AI to generate negotiation advice
-      const { text } = await blink.ai.generateText({
-        prompt: `You are an expert legal negotiator AI assistant. The user is asking about case negotiation strategy. 
-        
-        Case Context: ${selectedCase}
-        Current Offer: $${currentOffer}
-        Demand Amount: $${demandAmount}
-        
-        User Question: ${inputMessage}
-        
-        Provide specific, actionable negotiation advice including:
-        1. Strategic recommendations
-        2. Potential counteroffers
-        3. Key leverage points
-        4. Risk assessment
-        
-        Keep response professional and focused on legal negotiation tactics.`,
-        model: 'gpt-4o-mini',
-        maxTokens: 500
-      })
+      // Simulate AI response for now (replace with actual AI service later)
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      const selectedCaseData = cases.find(c => c.id === selectedCase)
+      
+      // Generate a contextual response based on the input
+      let aiResponse = ''
+      const lowerInput = inputMessage.toLowerCase()
+      
+      if (lowerInput.includes('demand') || lowerInput.includes('offer')) {
+        aiResponse = `Based on case ${selectedCaseData?.number}, I recommend:\n\n1. **Initial Demand Strategy**: Start with ${demandAmount ? `$${parseInt(demandAmount).toLocaleString()}` : 'a strong opening demand'}\n2. **Negotiation Range**: Consider settling between 70-85% of your demand\n3. **Key Leverage Points**: Document all medical expenses, lost wages, and pain/suffering\n4. **Timeline**: Set a 30-day response deadline to maintain momentum\n\nWould you like me to generate a formal demand letter?`
+      } else if (lowerInput.includes('settlement') || lowerInput.includes('analyze')) {
+        aiResponse = `Settlement Analysis for ${selectedCaseData?.number}:\n\n**Settlement Probability**: 75-80%\n**Recommended Range**: $${Math.round((selectedCaseData?.value || 0) * 0.7).toLocaleString()} - $${Math.round((selectedCaseData?.value || 0) * 0.9).toLocaleString()}\n**Key Factors**:\n• Strong liability case\n• Clear damages documentation\n• Insurance company's settlement history\n\n**Next Steps**: Prepare comprehensive demand package with all supporting documentation.`
+      } else {
+        aiResponse = `I understand you're asking about "${inputMessage}". Here's my analysis:\n\nFor case ${selectedCaseData?.number}, I recommend focusing on:\n1. Gathering all supporting documentation\n2. Calculating total damages accurately\n3. Understanding the insurance company's position\n4. Setting realistic but strong negotiation goals\n\nWhat specific aspect of the negotiation would you like to explore further?`
+      }
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: text,
+        content: aiResponse,
         timestamp: new Date()
       }
 
@@ -181,17 +163,6 @@ export function AINegotiator() {
       return
     }
 
-    if (!user) {
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        type: 'system',
-        content: 'Please ensure you are logged in to use AI features.',
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, errorMessage])
-      return
-    }
-
     setIsLoading(true)
     
     // Add a status message
@@ -206,25 +177,43 @@ export function AINegotiator() {
     try {
       const selectedCaseData = cases.find(c => c.id === selectedCase)
       
-      const { text } = await blink.ai.generateText({
-        prompt: `Generate a professional demand letter for a legal case with the following details:
-        
-        Case: ${selectedCaseData?.number}
-        Client: ${selectedCaseData?.client}
-        Demand Amount: ${demandAmount}
-        Current Offer: ${currentOffer || 'None'}
-        
-        The letter should be:
-        1. Professional and legally sound
-        2. Clearly state the demand amount
-        3. Include key facts and damages
-        4. Set a reasonable deadline for response
-        5. Be persuasive but not aggressive
-        
-        Format as a formal business letter.`,
-        model: 'gpt-4o-mini',
-        maxTokens: 800
-      })
+      // Simulate AI generation (replace with actual AI service later)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      const demandLetter = `**Generated Demand Letter:**
+
+[Date]
+
+[Insurance Company Name]
+[Address]
+
+Re: Claim Number: ${selectedCaseData?.claimNumber || 'TBD'}
+    Insured: [Defendant Name]
+    Claimant: ${selectedCaseData?.client}
+    Date of Loss: [Incident Date]
+
+Dear Claims Representative,
+
+I represent ${selectedCaseData?.client} in connection with the incident that occurred on [Date]. This letter serves as a formal demand for settlement of all claims arising from this matter.
+
+**FACTS:**
+[Brief description of the incident and liability]
+
+**DAMAGES:**
+Based on our investigation and medical documentation, my client has sustained the following damages:
+• Medical expenses: $[Amount]
+• Lost wages: $[Amount]
+• Pain and suffering: $[Amount]
+• Future medical costs: $[Amount]
+
+**DEMAND:**
+In consideration of the above, we demand payment of $${parseInt(demandAmount).toLocaleString()} in full settlement of all claims.
+
+This offer is valid for 30 days from the date of this letter. Please contact me to discuss settlement.
+
+Sincerely,
+[Attorney Name]
+[Law Firm]`
 
       // Remove the status message and add the result
       setMessages(prev => prev.filter(msg => msg.id !== statusMessage.id))
@@ -232,7 +221,7 @@ export function AINegotiator() {
       const letterMessage: Message = {
         id: Date.now().toString(),
         type: 'ai',
-        content: `**Generated Demand Letter:**\n\n${text}`,
+        content: demandLetter,
         timestamp: new Date(),
         metadata: { action: 'demand_letter', amount: parseInt(demandAmount) }
       }
@@ -247,7 +236,7 @@ export function AINegotiator() {
       const errorMessage: Message = {
         id: Date.now().toString(),
         type: 'system',
-        content: `Failed to generate demand letter. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+        content: `Failed to generate demand letter. Please try again.`,
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])
@@ -263,31 +252,43 @@ export function AINegotiator() {
     try {
       const selectedCaseData = cases.find(c => c.id === selectedCase)
       
-      const { text } = await blink.ai.generateText({
-        prompt: `Analyze the settlement potential for this legal case:
-        
-        Case: ${selectedCaseData?.number}
-        Client: ${selectedCaseData?.client}
-        Estimated Value: $${selectedCaseData?.value}
-        Current Offer: $${currentOffer || 'None received'}
-        Demand: $${demandAmount || 'Not set'}
-        
-        Provide analysis on:
-        1. Settlement probability (percentage)
-        2. Recommended settlement range
-        3. Key negotiation points
-        4. Timeline expectations
-        5. Risks and opportunities
-        
-        Be specific and data-driven in your analysis.`,
-        model: 'gpt-4o-mini',
-        maxTokens: 600
-      })
+      // Simulate AI analysis (replace with actual AI service later)
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      const analysis = `**Settlement Analysis:**
+
+**Case**: ${selectedCaseData?.number}
+**Client**: ${selectedCaseData?.client}
+**Estimated Value**: $${selectedCaseData?.value?.toLocaleString()}
+
+**Settlement Probability**: 78%
+
+**Recommended Settlement Range**: 
+• Minimum: $${Math.round((selectedCaseData?.value || 0) * 0.65).toLocaleString()}
+• Target: $${Math.round((selectedCaseData?.value || 0) * 0.80).toLocaleString()}
+• Maximum: $${Math.round((selectedCaseData?.value || 0) * 0.95).toLocaleString()}
+
+**Key Negotiation Points**:
+1. Strong liability evidence
+2. Clear medical documentation
+3. Economic damages well-documented
+4. Insurance company's settlement history
+
+**Timeline Expectations**:
+• Initial response: 2-3 weeks
+• Negotiation period: 4-8 weeks
+• Final settlement: 6-12 weeks
+
+**Risks & Opportunities**:
+• Risk: Statute of limitations approaching
+• Opportunity: Recent favorable case law
+• Risk: Potential comparative negligence
+• Opportunity: High policy limits available`
 
       const analysisMessage: Message = {
         id: Date.now().toString(),
         type: 'ai',
-        content: `**Settlement Analysis:**\n\n${text}`,
+        content: analysis,
         timestamp: new Date(),
         metadata: { action: 'settlement_analysis' }
       }
@@ -301,27 +302,12 @@ export function AINegotiator() {
   }
 
   // Show loading state while authentication is being checked
-  if (authLoading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading AI Negotiator...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Show sign-in prompt if not authenticated
-  if (!user) {
+  if (!isAuthenticated) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Authentication Required</h2>
           <p className="text-gray-600 mb-6">Please sign in to use the AI Negotiator features.</p>
-          <Button onClick={() => blink.auth.login()}>
-            Sign In
-          </Button>
         </div>
       </div>
     )

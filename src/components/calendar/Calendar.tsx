@@ -26,7 +26,8 @@ import {
   Gavel,
   User
 } from 'lucide-react'
-import { blink } from '../../blink/client'
+import { apiService } from '../../services/api'
+import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/use-toast'
 
 interface CalendarEvent {
@@ -75,7 +76,7 @@ export function Calendar() {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const { user, isAuthenticated } = useAuth()
   const [view, setView] = useState<'month' | 'week' | 'day' | 'agenda'>('month')
   const [showEventDialog, setShowEventDialog] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
@@ -97,29 +98,60 @@ export function Calendar() {
     reminder_minutes: 15
   })
 
-  const loadUserData = async () => {
-    try {
-      const userData = await blink.auth.me()
-      setUser(userData)
-    } catch (error) {
-      console.error('Error loading user data:', error)
-    }
-  }
-
   useEffect(() => {
-    loadUserData()
-  }, [])
-
-  useEffect(() => {
-    if (user) {
+    if (isAuthenticated) {
       const loadEvents = async () => {
         try {
           setLoading(true)
-          const eventList = await blink.db.calendarEvents.list({
-            where: { userId: user.id },
-            orderBy: { startDate: 'asc' }
-          })
-          setEvents(eventList)
+          // Mock events for now since we don't have calendar API endpoints
+          const mockEvents: CalendarEvent[] = [
+            {
+              id: '1',
+              title: 'Client Meeting - Sarah Johnson',
+              description: 'Discuss case progress and next steps',
+              start_date: new Date(Date.now() + 86400000).toISOString(),
+              end_date: new Date(Date.now() + 86400000 + 3600000).toISOString(),
+              event_type: 'meeting',
+              location: 'Conference Room A',
+              attendees: 'sarah.johnson@email.com',
+              case_id: '1',
+              priority: 'high',
+              reminder_minutes: 15,
+              user_id: user?.id || '',
+              created_at: new Date().toISOString()
+            },
+            {
+              id: '2',
+              title: 'Court Hearing - PI-2024-001',
+              description: 'Motion hearing for summary judgment',
+              start_date: new Date(Date.now() + 172800000).toISOString(),
+              end_date: new Date(Date.now() + 172800000 + 7200000).toISOString(),
+              event_type: 'court',
+              location: 'Superior Court Room 3',
+              attendees: '',
+              case_id: '1',
+              priority: 'high',
+              reminder_minutes: 60,
+              user_id: user?.id || '',
+              created_at: new Date().toISOString()
+            },
+            {
+              id: '3',
+              title: 'Discovery Deadline',
+              description: 'All discovery must be completed',
+              start_date: new Date(Date.now() + 604800000).toISOString(),
+              end_date: new Date(Date.now() + 604800000).toISOString(),
+              event_type: 'deadline',
+              location: '',
+              attendees: '',
+              case_id: '2',
+              priority: 'medium',
+              reminder_minutes: 1440,
+              user_id: user?.id || '',
+              created_at: new Date().toISOString()
+            }
+          ]
+          setEvents(mockEvents)
         } catch (error) {
           console.error('Error loading events:', error)
         } finally {
@@ -129,20 +161,30 @@ export function Calendar() {
 
       const loadCases = async () => {
         try {
-          const caseList = await blink.db.cases.list({
-            where: { userId: user.id },
-            orderBy: { createdAt: 'desc' }
-          })
-          setCases(caseList)
+          const response = await apiService.getCases()
+          if (response.success && response.data) {
+            const transformedCases = response.data.cases.map((case_: any) => ({
+              id: case_.id,
+              title: case_.caseNumber || case_.case_number,
+              client_name: case_.clientName || case_.client_name
+            }))
+            setCases(transformedCases)
+          }
         } catch (error) {
           console.error('Error loading cases:', error)
+          // Fallback to mock cases
+          setCases([
+            { id: '1', title: 'PI-2024-001', client_name: 'Sarah Johnson' },
+            { id: '2', title: 'AUTO-2024-015', client_name: 'Michael Chen' },
+            { id: '3', title: 'WC-2024-008', client_name: 'Lisa Rodriguez' }
+          ])
         }
       }
 
       loadEvents()
       loadCases()
     }
-  }, [user])
+  }, [isAuthenticated, user])
 
   const createEvent = async () => {
     if (!user || !newEvent.title || !newEvent.start_date) {
@@ -156,21 +198,23 @@ export function Calendar() {
 
     try {
       setLoading(true)
-      const event = await blink.db.calendarEvents.create({
+      
+      // For now, just add to local state since we don't have calendar API
+      const event: CalendarEvent = {
         id: `event_${Date.now()}`,
-        userId: user.id,
-        title: newEvent.title,
+        user_id: user.id,
+        title: newEvent.title!,
         description: newEvent.description || '',
-        startDate: newEvent.start_date,
-        endDate: newEvent.end_date || newEvent.start_date,
-        eventType: newEvent.event_type || 'meeting',
+        start_date: newEvent.start_date!,
+        end_date: newEvent.end_date || newEvent.start_date!,
+        event_type: newEvent.event_type || 'meeting',
         location: newEvent.location || '',
         attendees: newEvent.attendees || '',
-        caseId: newEvent.case_id || '',
+        case_id: newEvent.case_id || '',
         priority: newEvent.priority || 'medium',
-        reminderMinutes: newEvent.reminder_minutes || 15,
-        createdAt: new Date().toISOString()
-      })
+        reminder_minutes: newEvent.reminder_minutes || 15,
+        created_at: new Date().toISOString()
+      }
 
       setEvents(prev => [...prev, event])
       setNewEvent({
@@ -204,7 +248,7 @@ export function Calendar() {
 
   const deleteEvent = async (eventId: string) => {
     try {
-      await blink.db.calendarEvents.delete(eventId)
+      // For now, just remove from local state
       setEvents(prev => prev.filter(e => e.id !== eventId))
       setSelectedEvent(null)
       
@@ -246,7 +290,7 @@ export function Calendar() {
 
   const getEventsForDate = (date: Date) => {
     return events.filter(event => {
-      const eventDate = new Date(event.startDate)
+      const eventDate = new Date(event.start_date)
       return eventDate.toDateString() === date.toDateString()
     })
   }
@@ -254,13 +298,13 @@ export function Calendar() {
   const filteredEvents = events.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          event.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFilter = filterType === 'all' || event.eventType === filterType
+    const matchesFilter = filterType === 'all' || event.event_type === filterType
     return matchesSearch && matchesFilter
   })
 
   const upcomingEvents = events
-    .filter(event => new Date(event.startDate) >= new Date())
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+    .filter(event => new Date(event.start_date) >= new Date())
+    .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
     .slice(0, 5)
 
   const formatDate = (dateString: string) => {
@@ -299,12 +343,12 @@ export function Calendar() {
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-  if (!user) {
+  if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading calendar...</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Authentication Required</h2>
+          <p className="text-gray-600">Please sign in to access your calendar.</p>
         </div>
       </div>
     )
@@ -455,7 +499,7 @@ export function Calendar() {
                         <SelectItem value="">No case</SelectItem>
                         {cases.map((case_) => (
                           <SelectItem key={case_.id} value={case_.id}>
-                            {case_.title} - {case_.clientName}
+                            {case_.title} - {case_.client_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -567,11 +611,11 @@ export function Calendar() {
                         </div>
                         <div className="space-y-1">
                           {getEventsForDate(date).slice(0, 2).map(event => {
-                            const IconComponent = eventTypeIcons[event.eventType]
+                            const IconComponent = eventTypeIcons[event.event_type]
                             return (
                               <div
                                 key={event.id}
-                                className={`text-xs p-1 rounded cursor-pointer ${eventTypeColors[event.eventType]}`}
+                                className={`text-xs p-1 rounded cursor-pointer ${eventTypeColors[event.event_type]}`}
                                 onClick={() => setSelectedEvent(event)}
                               >
                                 <div className="flex items-center space-x-1">
@@ -615,14 +659,14 @@ export function Calendar() {
                       </div>
                     ) : (
                       filteredEvents.map(event => {
-                        const IconComponent = eventTypeIcons[event.eventType]
+                        const IconComponent = eventTypeIcons[event.event_type]
                         return (
                           <div
                             key={event.id}
                             className="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
                             onClick={() => setSelectedEvent(event)}
                           >
-                            <div className={`p-2 rounded-lg ${eventTypeColors[event.eventType]}`}>
+                            <div className={`p-2 rounded-lg ${eventTypeColors[event.event_type]}`}>
                               <IconComponent className="h-4 w-4" />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -638,7 +682,7 @@ export function Calendar() {
                                 </Badge>
                               </div>
                               <p className="text-sm text-gray-600 mt-1">
-                                {formatDate(event.startDate)} at {formatTime(event.startDate)}
+                                {formatDate(event.start_date)} at {formatTime(event.start_date)}
                               </p>
                               {event.location && (
                                 <div className="flex items-center text-sm text-gray-500 mt-1">
@@ -675,10 +719,10 @@ export function Calendar() {
                       <p className="text-gray-500 text-sm">No upcoming events</p>
                     ) : (
                       upcomingEvents.map(event => {
-                        const IconComponent = eventTypeIcons[event.eventType]
+                        const IconComponent = eventTypeIcons[event.event_type]
                         return (
                           <div key={event.id} className="flex items-center space-x-3">
-                            <div className={`p-1 rounded ${eventTypeColors[event.eventType]}`}>
+                            <div className={`p-1 rounded ${eventTypeColors[event.event_type]}`}>
                               <IconComponent className="h-3 w-3" />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -686,7 +730,7 @@ export function Calendar() {
                                 {event.title}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {formatDate(event.startDate)}
+                                {formatDate(event.start_date)}
                               </p>
                             </div>
                           </div>
@@ -711,7 +755,7 @@ export function Calendar() {
                       <span className="text-sm text-gray-600">This Month</span>
                       <span className="font-medium">
                         {events.filter(e => {
-                          const eventDate = new Date(e.startDate)
+                          const eventDate = new Date(e.start_date)
                           return eventDate.getMonth() === new Date().getMonth() &&
                                  eventDate.getFullYear() === new Date().getFullYear()
                         }).length}
@@ -757,7 +801,7 @@ export function Calendar() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center space-x-2">
-                {React.createElement(eventTypeIcons[selectedEvent.eventType], { className: "h-5 w-5" })}
+                {React.createElement(eventTypeIcons[selectedEvent.event_type], { className: "h-5 w-5" })}
                 <span>{selectedEvent.title}</span>
               </DialogTitle>
               <DialogDescription>
@@ -768,8 +812,8 @@ export function Calendar() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Type</Label>
-                  <Badge className={`mt-1 ${eventTypeColors[selectedEvent.eventType]}`}>
-                    {selectedEvent.eventType}
+                  <Badge className={`mt-1 ${eventTypeColors[selectedEvent.event_type]}`}>
+                    {selectedEvent.event_type}
                   </Badge>
                 </div>
                 <div>
@@ -787,9 +831,9 @@ export function Calendar() {
               <div>
                 <Label className="text-sm font-medium text-gray-500">Date & Time</Label>
                 <p className="mt-1">
-                  {formatDate(selectedEvent.startDate)} at {formatTime(selectedEvent.startDate)}
-                  {selectedEvent.endDate && selectedEvent.endDate !== selectedEvent.startDate && (
-                    <> - {formatTime(selectedEvent.endDate)}</>
+                  {formatDate(selectedEvent.start_date)} at {formatTime(selectedEvent.start_date)}
+                  {selectedEvent.end_date && selectedEvent.end_date !== selectedEvent.start_date && (
+                    <> - {formatTime(selectedEvent.end_date)}</>
                   )}
                 </p>
               </div>

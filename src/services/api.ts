@@ -1,13 +1,15 @@
 // Custom API service for independent backend
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://your-backend-domain.com/api'  // Replace with your production backend URL
+  ? 'https://your-backend-domain.vercel.app/api'  // Replace with your production backend URL
   : 'http://localhost:5000/api'
 
 interface ApiResponse<T> {
-  success: boolean
+  success?: boolean
   data?: T
   message?: string
   error?: string
+  user?: any
+  token?: string
 }
 
 class ApiService {
@@ -54,22 +56,34 @@ class ApiService {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || `HTTP error! status: ${response.status}`)
+        return {
+          success: false,
+          error: data.error || data.message || `HTTP error! status: ${response.status}`,
+          data: null
+        }
       }
 
-      return data
+      return {
+        success: true,
+        ...data
+      }
     } catch (error) {
       console.error('API request failed:', error)
-      throw error
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Network error',
+        data: null
+      }
     }
   }
 
   // Authentication methods
   async register(userData: {
-    name: string
+    firstName: string
+    lastName: string
     email: string
     password: string
-    firm_name?: string
+    firmName?: string
     phone?: string
   }) {
     return this.request<{ user: any; token: string }>('/auth/register', {
@@ -94,19 +108,19 @@ class ApiService {
   }
 
   async getProfile() {
-    return this.request<any>('/auth/profile')
+    return this.request<{ user: any }>('/auth/me')
   }
 
   async updateProfile(profileData: any) {
-    return this.request<any>('/auth/profile', {
+    return this.request<{ user: any }>('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
     })
   }
 
   async changePassword(currentPassword: string, newPassword: string) {
-    return this.request('/auth/change-password', {
-      method: 'POST',
+    return this.request('/auth/password', {
+      method: 'PUT',
       body: JSON.stringify({ currentPassword, newPassword }),
     })
   }
@@ -174,17 +188,34 @@ class ApiService {
       headers.Authorization = `Bearer ${this.token}`
     }
 
-    const response = await fetch(`${API_BASE_URL}/documents/upload`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    })
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      })
 
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || 'Upload failed',
+          data: null
+        }
+      }
+
+      return {
+        success: true,
+        ...data
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Upload failed',
+        data: null
+      }
     }
-
-    return response.json()
   }
 
   async getDocuments(caseId?: string) {

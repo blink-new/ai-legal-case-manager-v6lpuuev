@@ -21,8 +21,8 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
     setLoading(true)
+    setError('')
 
     try {
       await login(email, password)

@@ -1,9 +1,21 @@
 const jwt = require('jsonwebtoken');
 const { database } = require('../config/database');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-fallback-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
 
-// Middleware to verify JWT token
+function generateToken(userId, email) {
+  return jwt.sign(
+    { 
+      id: userId, 
+      email: email 
+    },
+    JWT_SECRET,
+    { 
+      expiresIn: process.env.JWT_EXPIRES_IN || '7d' 
+    }
+  );
+}
+
 async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
@@ -16,7 +28,7 @@ async function authenticateToken(req, res, next) {
   }
 
   try {
-    // Verify the token
+    // Verify JWT token
     const decoded = jwt.verify(token, JWT_SECRET);
     
     // Check if session exists and is valid
@@ -28,68 +40,65 @@ async function authenticateToken(req, res, next) {
     if (!session) {
       return res.status(401).json({
         error: 'Invalid token',
-        message: 'Token has expired or been revoked'
+        message: 'Token has expired or is invalid'
       });
     }
 
-    // Get user details
+    // Get user data
     const user = await database.get(
-      'SELECT id, email, first_name, last_name, role, firm_name, phone, is_active FROM users WHERE id = ?',
-      [decoded.userId]
+      'SELECT id, email, first_name, last_name, role, firm_name, phone FROM users WHERE id = ? AND is_active = 1',
+      [decoded.id]
     );
 
-    if (!user || !user.is_active) {
+    if (!user) {
       return res.status(401).json({
         error: 'User not found',
-        message: 'User account is inactive or does not exist'
+        message: 'User account not found or inactive'
       });
     }
 
-    // Add user info to request object
+    // Attach user and token to request
     req.user = user;
     req.token = token;
     next();
+
   } catch (error) {
     console.error('Token verification error:', error);
     
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         error: 'Token expired',
-        message: 'Please log in again'
+        message: 'Your session has expired. Please log in again.'
       });
     }
     
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         error: 'Invalid token',
-        message: 'Token is malformed'
+        message: 'Token is malformed or invalid'
       });
     }
 
     return res.status(500).json({
       error: 'Authentication error',
-      message: 'Failed to authenticate token'
+      message: 'An error occurred during authentication'
     });
   }
 }
 
-// Middleware to check user roles
 function requireRole(roles) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
         error: 'Authentication required',
-        message: 'Please log in first'
+        message: 'You must be logged in to access this resource'
       });
     }
 
-    const userRole = req.user.role;
-    const allowedRoles = Array.isArray(roles) ? roles : [roles];
-
-    if (!allowedRoles.includes(userRole)) {
+    if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         error: 'Insufficient permissions',
-        message: `Access denied. Required role: ${allowedRoles.join(' or ')}`
+        message: 'You do not have permission to access this resource'
       });
     }
 
@@ -97,39 +106,8 @@ function requireRole(roles) {
   };
 }
 
-// Generate JWT token
-function generateToken(userId, email) {
-  return jwt.sign(
-    { 
-      userId, 
-      email,
-      iat: Math.floor(Date.now() / 1000)
-    },
-    JWT_SECRET,
-    { 
-      expiresIn: '7d' // Token expires in 7 days
-    }
-  );
-}
-
-// Clean up expired sessions
-async function cleanupExpiredSessions() {
-  try {
-    const result = await database.run(
-      'DELETE FROM sessions WHERE expires_at <= datetime("now")'
-    );
-    console.log(`Cleaned up ${result.changes} expired sessions`);
-  } catch (error) {
-    console.error('Error cleaning up expired sessions:', error);
-  }
-}
-
-// Run cleanup every hour
-setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
-
 module.exports = {
-  authenticateToken,
-  requireRole,
   generateToken,
-  cleanupExpiredSessions
+  authenticateToken,
+  requireRole
 };

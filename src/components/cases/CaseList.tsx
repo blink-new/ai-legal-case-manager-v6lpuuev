@@ -24,7 +24,8 @@ import {
   Loader2
 } from 'lucide-react'
 import { Case } from '@/types/case'
-import { blink } from '@/blink/client'
+import { apiService } from '@/services/api'
+import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
 
 interface CaseListProps {
@@ -39,7 +40,7 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const { user, isAuthenticated } = useAuth()
   const { toast } = useToast()
 
   // Form state
@@ -63,17 +64,17 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
   const [uploading, setUploading] = useState(false)
 
   const loadCases = useCallback(async () => {
-    if (!user?.id) return
+    if (!isAuthenticated) return
     
     try {
       setLoading(true)
-      const casesData = await blink.db.cases.list({
-        where: { userId: user.id },
-        orderBy: { createdAt: 'desc' }
-      })
+      const response = await apiService.getCases()
       
-      // The Blink SDK automatically handles camelCase conversion
-      setCases(casesData || [])
+      if (response.success && response.data) {
+        setCases(response.data.cases || [])
+      } else {
+        setCases([])
+      }
     } catch (error) {
       console.error('Error loading cases:', error)
       toast({
@@ -85,23 +86,14 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
     } finally {
       setLoading(false)
     }
-  }, [user?.id, toast])
-
-  // Load user and cases
-  useEffect(() => {
-    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
-      setUser(state.user)
-      setLoading(state.isLoading)
-    })
-    return unsubscribe
-  }, [])
+  }, [isAuthenticated, toast])
 
   // Load cases when user changes
   useEffect(() => {
-    if (user?.id) {
+    if (isAuthenticated) {
       loadCases()
     }
-  }, [user?.id, loadCases])
+  }, [isAuthenticated, loadCases])
 
   // Mock data for initial display if no cases exist
   const mockCases: Case[] = [
@@ -225,8 +217,8 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
       // Generate case number
       const caseNumber = generateCaseNumber(formData.caseType)
       
-      // Create case in database
-      const newCase = await blink.db.cases.create({
+      // Create case via API
+      const response = await apiService.createCase({
         caseNumber: caseNumber,
         clientName: formData.clientName,
         clientEmail: formData.clientEmail,
@@ -240,43 +232,31 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
         incidentDate: formData.incidentDate,
         description: formData.description,
         assignedAttorney: formData.assignedAttorney || user.email,
-        userId: user.id,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       })
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create case')
+      }
+
+      const newCase = response.data
 
       // Upload documents if any
       if (uploadedFiles.length > 0) {
         for (let i = 0; i < uploadedFiles.length; i++) {
           const file = uploadedFiles[i]
-          const fileName = `${newCase.id}/${file.name}`
           
           try {
             setUploadProgress(prev => ({ ...prev, [file.name]: 0 }))
             
-            const { publicUrl } = await blink.storage.upload(
-              file,
-              `cases/${fileName}`,
-              {
-                onProgress: (percent) => {
-                  setUploadProgress(prev => ({ ...prev, [file.name]: percent }))
-                }
-              }
-            )
+            const uploadResponse = await apiService.uploadDocument(file, newCase.id)
 
-            // Save document record
-            await blink.db.documents.create({
-              caseId: newCase.id,
-              fileName: file.name,
-              fileType: file.type,
-              fileSize: file.size,
-              category: 'other',
-              publicUrl: publicUrl,
-              userId: user.id,
-              uploadedAt: new Date().toISOString()
-            })
-
-            setUploadProgress(prev => ({ ...prev, [file.name]: 100 }))
+            if (uploadResponse.success) {
+              setUploadProgress(prev => ({ ...prev, [file.name]: 100 }))
+            } else {
+              throw new Error(uploadResponse.error || 'Upload failed')
+            }
           } catch (error) {
             console.error(`Error uploading ${file.name}:`, error)
             toast({
@@ -318,7 +298,7 @@ export function CaseList({ onCaseSelect }: CaseListProps) {
       console.error('Error creating case:', error)
       toast({
         title: "Error",
-        description: "Failed to create case",
+        description: error instanceof Error ? error.message : "Failed to create case",
         variant: "destructive"
       })
     } finally {

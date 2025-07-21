@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Upload, FileText, Image, Download, Eye, Trash2, Search, Filter, Plus, Brain, FileCheck } from 'lucide-react'
-import { blink } from '@/blink/client'
+import { apiService } from '@/services/api'
+import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
 
 interface Document {

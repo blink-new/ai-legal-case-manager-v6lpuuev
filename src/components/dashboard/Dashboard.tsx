@@ -14,7 +14,8 @@ import {
   ArrowRight
 } from 'lucide-react'
 import { Case } from '@/types/case'
-import { blink } from '@/blink/client'
+import { apiService } from '@/services/api'
+import { useAuth } from '@/hooks/useAuth'
 
 interface DashboardProps {
   onNavigate: (tab: string, caseId?: string) => void
@@ -23,44 +24,35 @@ interface DashboardProps {
 export function Dashboard({ onNavigate }: DashboardProps) {
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
+  const { user, isAuthenticated } = useAuth()
 
   // Load cases from database
   const loadCases = useCallback(async () => {
-    if (!user?.id) return
+    if (!isAuthenticated) return
     
     try {
       setLoading(true)
-      const casesData = await blink.db.cases.list({
-        where: { userId: user.id },
-        orderBy: { createdAt: 'desc' },
-        limit: 5 // Only get recent 5 cases for dashboard
-      })
+      const response = await apiService.getCases({ limit: 5 })
       
-      setCases(casesData || [])
+      if (response.success && response.data) {
+        setCases(response.data.cases || [])
+      } else {
+        setCases([])
+      }
     } catch (error) {
       console.error('Error loading cases:', error)
       setCases([])
     } finally {
       setLoading(false)
     }
-  }, [user?.id])
-
-  // Load user and cases
-  useEffect(() => {
-    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
-      setUser(state.user)
-      setLoading(state.isLoading)
-    })
-    return unsubscribe
-  }, [])
+  }, [isAuthenticated])
 
   // Load cases when user changes
   useEffect(() => {
-    if (user?.id) {
+    if (isAuthenticated) {
       loadCases()
     }
-  }, [user?.id, loadCases])
+  }, [isAuthenticated, loadCases])
 
   // Calculate dynamic stats from actual cases
   const activeCases = cases.filter(c => c.status !== 'settled' && c.status !== 'closed').length

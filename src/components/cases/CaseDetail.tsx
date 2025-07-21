@@ -36,7 +36,8 @@ import {
   Bell
 } from 'lucide-react'
 import { Case, Document } from '@/types/case'
-import { blink } from '@/blink/client'
+import { apiService } from '@/services/api'
+import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
 
 interface CaseDetailProps {

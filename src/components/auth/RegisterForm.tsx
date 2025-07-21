@@ -13,11 +13,12 @@ interface RegisterFormProps {
 
 export function RegisterForm({ onToggleMode }: RegisterFormProps) {
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
-    firm_name: '',
+    firmName: '',
     phone: ''
   })
   const [loading, setLoading] = useState(false)
@@ -50,10 +51,11 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
 
     try {
       await register({
-        name: formData.name,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
         email: formData.email,
         password: formData.password,
-        firm_name: formData.firm_name,
+        firmName: formData.firmName,
         phone: formData.phone
       })
     } catch (err) {
@@ -85,20 +87,39 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
             </Alert>
           )}
           
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <div className="relative">
-              <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="Enter your full name"
-                value={formData.name}
-                onChange={handleChange}
-                className="pl-10"
-                required
-              />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="firstName"
+                  name="firstName"
+                  type="text"
+                  placeholder="First name"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  type="text"
+                  placeholder="Last name"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  className="pl-10"
+                  required
+                />
+              </div>
             </div>
           </div>
           
@@ -120,15 +141,15 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="firm_name">Law Firm Name</Label>
+            <Label htmlFor="firmName">Law Firm Name</Label>
             <div className="relative">
               <Building className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
-                id="firm_name"
-                name="firm_name"
+                id="firmName"
+                name="firmName"
                 type="text"
                 placeholder="Enter your firm name"
-                value={formData.firm_name}
+                value={formData.firmName}
                 onChange={handleChange}
                 className="pl-10"
               />
